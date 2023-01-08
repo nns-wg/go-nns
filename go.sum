@@ -475,6 +475,8 @@ github.com/libp2p/go-libp2p-quic-transport v0.16.1/go.mod h1:1BXjVMzr+w7EkPfiHkK
 github.com/libp2p/go-libp2p-record v0.2.0 h1:oiNUOCWno2BFuxt3my4i1frNrt7PerzB3queqa1NkQ0=
 github.com/libp2p/go-libp2p-record v0.2.0/go.mod h1:I+3zMkvvg5m2OcSdoL0KPljyJyvNDFGKX7QdlpYUcwk=
 github.com/libp2p/go-libp2p-resource-manager v0.1.5/go.mod h1:wJPNjeE4XQlxeidwqVY5G6DLOKqFK33u2n8blpl0I6Y=
+github.com/libp2p/go-libp2p-routing-helpers v0.4.0 h1:b7y4aixQ7AwbqYfcOQ6wTw8DQvuRZeTAA0Od3YYN5yc=
+github.com/libp2p/go-libp2p-routing-helpers v0.4.0/go.mod h1:dYEAgkVhqho3/YKxfOEGdFMIcWfAFNlZX8iAIihYA2E=
 github.com/libp2p/go-libp2p-swarm v0.8.0/go.mod h1:sOMp6dPuqco0r0GHTzfVheVBh6UEL0L1lXUZ5ot2Fvc=
 github.com/libp2p/go-libp2p-swarm v0.10.0/go.mod h1:71ceMcV6Rg/0rIQ97rsZWMzto1l9LnNquef+efcRbmA=
 github.com/libp2p/go-libp2p-swarm v0.10.2/go.mod h1:Pdkq0QU5a+qu+oyqIV3bknMsnzk9lnNyKvB9acJ5aZs=

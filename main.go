@@ -12,7 +12,6 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -34,32 +33,38 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	h, err := libp2p.New()
+	host, err := libp2p.New()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Printf("Host ID: %s", h.ID().Pretty())
+	log.Printf("Host ID: %s", host.ID().Pretty())
 	log.Printf("Connect to me on:")
-	for _, addr := range h.Addrs() {
-		log.Printf("  %s/p2p/%s", addr, h.ID().Pretty())
+	for _, addr := range host.Addrs() {
+		log.Printf("  %s/p2p/%s", addr, host.ID().Pretty())
 	}
 
-	dht, err := NewDHT(ctx, h, config.DiscoveryPeers)
+	dht, err := NewDHT(ctx, host, config.DiscoveryPeers)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	service := NewService(h, protocol.ID("/p2p/nns"))
-	err = service.SetupNNS()
+	//go Discover(ctx, host, dht)
+
+	err = dht.PutValue(ctx, "/unvalidated/hello", []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("put %s", err)
+	} else {
+		log.Printf("successfully pub?")
+	}
+	setValue, err := dht.GetValue(ctx, "/unvalidated/hello")
+	if err != nil {
+		log.Printf("get %s", err)
 	}
 
-	go Discover(ctx, h, dht)
-	go service.StartNNS(ctx)
+	log.Printf("The value? %s", setValue)
 
-	run(h, cancel)
+	run(host, cancel)
 }
 
 func run(h host.Host, cancel func()) {

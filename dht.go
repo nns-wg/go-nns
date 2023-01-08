@@ -14,9 +14,13 @@ import (
 func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr) (*dht.IpfsDHT, error) {
 	var options []dht.Option
 
+	log.Printf("%v", bootstrapPeers)
 	if len(bootstrapPeers) == 0 {
 		options = append(options, dht.Mode(dht.ModeServer))
 	}
+
+	options = append(options, dht.NamespacedValidator("unvalidated", Validator{}))
+	options = append(options, dht.ProtocolPrefix("/nns"))
 
 	kdht, err := dht.New(ctx, host, options...)
 	if err != nil {
