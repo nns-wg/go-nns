@@ -5,22 +5,21 @@ import (
 	"log"
 	"sync"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 )
 
 func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr) (*dht.IpfsDHT, error) {
 	var options []dht.Option
 
-	log.Printf("%v", bootstrapPeers)
-	if len(bootstrapPeers) == 0 {
-		options = append(options, dht.Mode(dht.ModeServer))
-	}
-
-	options = append(options, dht.NamespacedValidator("unvalidated", Validator{}))
-	options = append(options, dht.ProtocolPrefix("/nns"))
+	options = append(
+		options,
+		dht.Mode(dht.ModeAutoServer),
+	  dht.Validator(Validator{ctx: ctx}),
+    dht.ProtocolPrefix("/nns"))
 
 	kdht, err := dht.New(ctx, host, options...)
 	if err != nil {
@@ -48,4 +47,25 @@ func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mult
 	wg.Wait()
 
 	return kdht, nil
+}
+
+func initializeDHT(ctx context.Context, discoveryPeers addrList) (host.Host, *dht.IpfsDHT) {
+
+	host, err := libp2p.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("Host ID: %s", host.ID().Pretty())
+	log.Printf("Connect to me on:")
+	for _, addr := range host.Addrs() {
+		log.Printf("  %s/p2p/%s", addr, host.ID().Pretty())
+	}
+
+	dht, err := NewDHT(ctx, host, discoveryPeers)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return host, dht
 }

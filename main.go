@@ -4,82 +4,68 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 
-	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/multiformats/go-multiaddr"
 )
 
+type addrList []multiaddr.Multiaddr
+
 type Config struct {
-	Port           int
+	ListenAddr     string
 	ProtocolID     string
 	DiscoveryPeers addrList
+	Standalone     bool
 }
-
-type addrList []multiaddr.Multiaddr
 
 func main() {
 
-	config := Config{}
-
-	flag.Var(&config.DiscoveryPeers, "peer", "Peer multiaddress for peer discovery")
-	flag.IntVar(&config.Port, "port", 0, "")
-	flag.Parse()
+	config := parseFlags()
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	host, err := libp2p.New()
-	if err != nil {
-		log.Fatal(err)
-	}
+	hosts := initializeDHTHosts(ctx, config)
 
-	log.Printf("Host ID: %s", host.ID().Pretty())
-	log.Printf("Connect to me on:")
-	for _, addr := range host.Addrs() {
-		log.Printf("  %s/p2p/%s", addr, host.ID().Pretty())
-	}
+	httpErrCh := make(chan error, 1)
+	go InitializeHTTP(httpErrCh, hosts[0].dht, config.ListenAddr)
 
-	dht, err := NewDHT(ctx, host, config.DiscoveryPeers)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	//go Discover(ctx, host, dht)
-
-	err = dht.PutValue(ctx, "/unvalidated/hello", []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
-	if err != nil {
-		log.Printf("put %s", err)
-	} else {
-		log.Printf("successfully pub?")
-	}
-	setValue, err := dht.GetValue(ctx, "/unvalidated/hello")
-	if err != nil {
-		log.Printf("get %s", err)
-	}
-
-	log.Printf("The value? %s", setValue)
-
-	run(host, cancel)
+	run(hosts, httpErrCh, cancel)
 }
 
-func run(h host.Host, cancel func()) {
+func parseFlags() Config {
+	config := Config{}
+
+	flag.Var(&config.DiscoveryPeers, "peer", "Multiaddress for discovery of NNS peers")
+	flag.StringVar(&config.ListenAddr, "addr", ":3333", "Listening address for NNS HTTP interface")
+	flag.BoolVar(&config.Standalone, "standalone", false, "Run in standalone mode. Will accept saves without peers.")
+	flag.Parse()
+
+	return config
+}
+
+func run(hosts []dhtHost, httpErrCh chan error, cancel func()) {
 	c := make(chan os.Signal, 1)
 
 	signal.Notify(c, os.Interrupt, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
-	<-c
 
-	fmt.Printf("\rExiting...\n")
+	select {
+	case <-c:
+	  fmt.Printf("\rExiting...\n")
+	case err := <-httpErrCh:
+		fmt.Printf("\rError in HTTP Server: %s", err)
+	}
 
 	cancel()
 
-	if err := h.Close(); err != nil {
-		panic(err)
+	for _, h := range hosts {
+		if err := h.host.Close(); err != nil {
+			panic(err)
+		}
 	}
+
 	os.Exit(0)
 }
 
