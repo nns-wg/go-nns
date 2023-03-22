@@ -5,21 +5,19 @@ import (
 	"fmt"
 	"log"
 
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/multiformats/go-multiaddr"
 )
-
-type dhtHost struct {
-	host host.Host
-	dht *dht.IpfsDHT
-}
 
 func initializeDHTHosts(ctx context.Context, config Config) []dhtHost {
 	var hosts []dhtHost
 
-	host, dht := initializeDHT(ctx, config.DiscoveryPeers)
-	hosts = append(hosts, dhtHost{host, dht})
+	nnsConfig := NNSConfig{
+		Port:               config.DHTPort,
+		PrivateListenAddrs: config.PrivateDHTListenAddrs,
+		PublicListenAddrs:  config.PublicDHTListenAddrs,
+	}
+	host := initializeDHT(ctx, nnsConfig, config.DiscoveryPeers)
+	hosts = append(hosts, host)
 
 	if config.Standalone {
 		/*
@@ -28,14 +26,20 @@ func initializeDHTHosts(ctx context.Context, config Config) []dhtHost {
 		 * what that is yet. FIXME this shouldn't be necessary (but probably requires
 		 * modification of libp2p to fix).
 		 */
-		hostAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("%s/p2p/%s", host.Addrs()[0], host.ID().Pretty()))
+		hostAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("%s/p2p/%s", host.host.Addrs()[0], host.host.ID().Pretty()))
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		nnsConfig := NNSConfig{
+			Port:               "0",
+			PrivateListenAddrs: []string{"/ip4/127.0.0.1", "/ip6/::1"},
+			PublicListenAddrs:  []string{"/ip4/127.0.0.1", "ip6/::1"},
+		}
 		hostAddrs := []multiaddr.Multiaddr{hostAddr}
-		host2, dht2 := initializeDHT(ctx, hostAddrs)
-		hosts = append(hosts, dhtHost{host2, dht2})
+		host = initializeDHT(ctx, nnsConfig, hostAddrs)
+		hosts = append(hosts, host)
 	}
 
-  return hosts
+	return hosts
 }

@@ -25,6 +25,10 @@ type DIDPubKeyResolver interface {
 	ResolveDIDKey(ctx context.Context, did string, tok *jwt.Token) (didkey.ID, error)
 }
 
+type IssuerMatcher interface {
+	MatchIssuer(iss string, name string) (bool)
+}
+
 type Token struct {
 	// Entire UCAN as a signed JWT string
 	Raw string
@@ -49,22 +53,27 @@ type TokenParser struct {
 	ap   ucan.AttenuationConstructorFunc
 	cidr ucan.CIDBytesResolver
 	didr DIDPubKeyResolver
+	issm IssuerMatcher // really, the issuer matcher should be linked to the
+                     // didpubkeyresolver, since support for names is linked to
+                     // the pubkey resolver, but that's a bigger api change, so
+										 // holding off for now
 }
 
 // NewTokenParser constructs a token parser
-func NewTokenParser(ap ucan.AttenuationConstructorFunc, didr DIDPubKeyResolver, cidr ucan.CIDBytesResolver) *TokenParser {
+func NewTokenParser(ap ucan.AttenuationConstructorFunc, didr DIDPubKeyResolver, cidr ucan.CIDBytesResolver, issm IssuerMatcher) *TokenParser {
 	return &TokenParser{
 		ap:   ap,
 		cidr: cidr,
 		didr: didr,
+		issm: issm,
 	}
 }
 
-func (p *TokenParser) ParseAndVerify(ctx context.Context, raw string) (*Token, error) {
-	return p.parseAndVerify(ctx, raw, nil)
+func (p *TokenParser) ParseAndVerify(ctx context.Context, name string, raw string) (*Token, error) {
+	return p.parseAndVerify(ctx, name, raw, nil)
 }
 
-func (p *TokenParser) parseAndVerify(ctx context.Context, raw string, child *Token) (*Token, error) {
+func (p *TokenParser) parseAndVerify(ctx context.Context, name string, raw string, child *Token) (*Token, error) {
 
 	tok, err := jwt.Parse(raw, p.matchVerifyFunc(ctx))
 	if err != nil {
@@ -80,8 +89,8 @@ func (p *TokenParser) parseAndVerify(ctx context.Context, raw string, child *Tok
 	var issDID string
 
 	if issStr, ok := mc["iss"].(string); ok {
+
 		issKey, err = p.didr.ResolveDIDKey(ctx, issStr, tok)
-		//resolveDidKeyFor(issStr, tok)
 		if err != nil {
 			return nil, err
 		}
@@ -93,6 +102,14 @@ func (p *TokenParser) parseAndVerify(ctx context.Context, raw string, child *Tok
 	var audKey didkey.ID
 	var audDID string
 	if audStr, ok := mc["aud"].(string); ok {
+		// n.b. ideally we would do this for the *issuer*, but existing UCAN tools
+		// (i.e., js ucans) can't (?) sign UCANs for non-did:key issuers, so we're
+		// just working with what we've got.
+		ok = p.issm.MatchIssuer(audStr, name)
+		if !ok {
+			return nil, fmt.Errorf(`"iss" key does not match name (%s != %s)`, audStr, name)
+		}
+
 		audKey, err = p.didr.ResolveDIDKey(ctx, audStr, tok)
 		if err != nil {
 			return nil, err
@@ -212,3 +229,13 @@ func resolveHttpKey(iss string, tok *jwt.Token) (didkey.ID, error) {
 
 }
 */
+
+type GenericIssuerMatcher struct{}
+
+func (GenericIssuerMatcher) MatchIssuer(iss string, name string) (bool) {
+	switch {
+	case strings.HasPrefix(iss, "did:mailto:"):
+		return resolvers.MatchMailtoIssuer(iss, name)
+	}
+	return false
+}

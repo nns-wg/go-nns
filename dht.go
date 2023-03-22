@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
 
@@ -18,8 +19,8 @@ func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mult
 	options = append(
 		options,
 		dht.Mode(dht.ModeAutoServer),
-	  dht.Validator(Validator{ctx: ctx}),
-    dht.ProtocolPrefix("/nns"))
+		dht.Validator(Validator{ctx: ctx}),
+		dht.ProtocolPrefix("/nns"))
 
 	kdht, err := dht.New(ctx, host, options...)
 	if err != nil {
@@ -49,9 +50,37 @@ func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mult
 	return kdht, nil
 }
 
-func initializeDHT(ctx context.Context, discoveryPeers addrList) (host.Host, *dht.IpfsDHT) {
+type NNSConfig struct {
+	Port               string
+	PrivateListenAddrs []string
+	PublicListenAddrs  []string
+}
 
-	host, err := libp2p.New()
+// This is lifted from the libp2p defaults.
+var listenAddrTemplates = []string{
+	"%s/tcp/%s",
+	"%s/udp/%s/quic",
+	"%s/udp/%s/quic-v1",
+	"%s/udp/%s/quic-v1/webtransport",
+}
+
+type dhtHost struct {
+	host host.Host
+	dht  *dht.IpfsDHT
+	pubAddrs []string
+}
+
+func initializeDHT(ctx context.Context, config NNSConfig, discoveryPeers addrList) (dhtHost) {
+
+	var privAddrs []string
+
+	for _, listenAddrTemplate := range listenAddrTemplates {
+		for _, listenAddr := range config.PrivateListenAddrs {
+			privAddrs = append(privAddrs, fmt.Sprintf(listenAddrTemplate, listenAddr, config.Port))
+		}
+	}
+
+	host, err := libp2p.New(libp2p.ListenAddrStrings(privAddrs...))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -67,5 +96,5 @@ func initializeDHT(ctx context.Context, discoveryPeers addrList) (host.Host, *dh
 		log.Fatal(err)
 	}
 
-	return host, dht
+	return dhtHost{host, dht, config.PublicListenAddrs}
 }

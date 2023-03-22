@@ -30,8 +30,8 @@ func (v Validator) Validate(key string, value []byte) error {
 		return ucan.Attenuation{Rsc: rsc, Cap: caps.Cap("DELEGATE")}, nil
 	}
 
-	parser := whocan.NewTokenParser(ac, whocan.GenericDIDPubKeyResolver{}, store.(ucan.CIDBytesResolver))
-	tok, err := parser.ParseAndVerify(v.ctx, string(value[:]))
+	parser := whocan.NewTokenParser(ac, whocan.GenericDIDPubKeyResolver{}, store.(ucan.CIDBytesResolver), whocan.GenericIssuerMatcher{})
+	tok, err := parser.ParseAndVerify(v.ctx, key, string(value[:]))
 	if err != nil {
 		log.Printf("Unable to parse/verify token: %+v", err)
 		return err

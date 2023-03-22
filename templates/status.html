@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <link rel="stylesheet" href="/static/style.css" />
+    <meta name="description" content="NNS Host Status" />
+    <title>NNS Host Status</title>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>NNS Host Status</h1>
+      </header>
+      
+      <section>
+        <h2>Host ID</h2>
+        <div class="lozenge">{{.HostId}}</div>
+      </section>
+      <section>
+        <h2>Addresses</h2>
+        You can connect to this node using any of the following addresses:
+
+        <ul>
+          {{range $addr := .MultiAddresses}}
+            <li class="lozenge"><pre>{{$addr}}</pre> <button class="copy-button">&#x1F4CB;</button></li>
+          {{end}}
+        </ul>
+
+        <script>
+          async function copyUrl(event) {
+            event.stopPropagation();
+            let url;
+            switch (event.target.tagName) {
+              case 'BUTTON':
+                url = event.target.previousElementSibling.innerText;
+                break;
+              case 'PRE':
+                url = event.target.innerText;
+                break;
+              case 'LI':
+                url = event.target.querySelector('pre').innerText;
+                break;
+              default:
+                throw new Error("something went wrong")
+            }
+            try {
+              if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(url);
+              } else {
+                // Use the 'out of viewport hidden text area' trick
+                const textArea = document.createElement("textarea");
+                textArea.value = url;
+                    
+                // Move textarea out of the viewport so it's not visible
+                textArea.style.position = "absolute";
+                textArea.style.left = "-999999px";
+                    
+                document.body.prepend(textArea);
+                textArea.select();
+
+                try {
+                  document.execCommand('copy');
+                } catch (error) {
+                  console.error(error);
+                } finally {
+                  textArea.remove();
+                }
+              }
+              alert('URL copied to clipboard!');
+            } catch (err) {
+              console.error('Failed to copy URL: ', err);
+            }
+          }
+
+          document.querySelectorAll('.copy-button, li').forEach(element => {
+            element.addEventListener('click', copyUrl);
+          });
+        </script>
+      </section>
+    </div>
+  </body>
+</html>

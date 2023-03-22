@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/mail"
 	"regexp"
+	"strings"
 
 	"github.com/emersion/go-msgauth/dkim"
 	"github.com/golang-jwt/jwt"
@@ -127,4 +128,24 @@ func verifyMessageDKIM(rawMessage string) error {
 	}
 
 	return nil
+}
+
+func MatchMailtoIssuer(iss string, name string) (bool) {
+  if !strings.HasPrefix(iss, "did:mailto:") {
+		return false
+	}
+
+  issAddr := iss[len("did:mailto:"):]
+
+	log.Printf("name: %s, iss: %s, issAddr: %s", name, iss, issAddr)
+
+	switch name {
+		case issAddr: return true // this likely needs some validation
+
+		// as do these, but more worried about the first one
+		case "mailto:" + issAddr: return true
+		case "acct:" + issAddr: return true
+	}
+
+	return false
 }

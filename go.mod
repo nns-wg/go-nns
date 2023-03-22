@@ -3,6 +3,7 @@ module github.com/nns-wg/go-nns
 go 1.20
 
 replace github.com/nns-wg/go-nns/resolvers => ./resolvers
+replace github.com/nns-wg/go-nns/whocan => ./whocan
 
 require (
 	github.com/emersion/go-msgauth v0.6.6
@@ -12,6 +13,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.8.0
 	github.com/ucan-wg/go-ucan v0.0.0-20220326223643-c90281f7a4ac
 	github.com/nns-wg/go-nns/resolvers v0.0.0
+	github.com/nns-wg/go-nns/whocan v0.0.0
 )
 
 require (
