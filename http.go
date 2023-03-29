@@ -74,6 +74,16 @@ func handleSet(dht *dht.IpfsDHT, w http.ResponseWriter, r *http.Request) {
 
 func handleGet(dht *dht.IpfsDHT, w http.ResponseWriter, r *http.Request) {
 
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+
+	// Return preflight request for CORS
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	// strip leading '/'
 	name := r.URL.Path[1:]
 	val, err := dht.GetValue(r.Context(), name)
@@ -136,7 +146,7 @@ func infoPage(dhtHost *dhtHost) func(w http.ResponseWriter, r *http.Request) {
 
 		sort.Strings(multiAddresses)
 		result := make([]string, 0, len(multiAddresses))
-		for i, _ := range multiAddresses {
+		for i := range multiAddresses {
 			if i == 0 || multiAddresses[i] != multiAddresses[i-1] {
 				result = append(result, multiAddresses[i])
 			}
