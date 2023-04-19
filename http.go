@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -17,37 +18,72 @@ import (
 //go:embed templates/status.html
 var statusTemplate embed.FS
 
-//go:embed templates/index.html
-var indexTemplate embed.FS
-
 //go:embed static/*
 var staticFiles embed.FS
+
+//go:embed nns-web/build/*
+//go:embed nns-web/build/_app/immutable/chunks/*
+//go:embed nns-web/build/_app/immutable/entry/*
+//go:embed nns-web/build/_app/immutable/assets/*
+var svelteFs embed.FS
 
 func InitializeHTTP(errCh chan<- error, dht dhtHost, listenAddr string) {
 	http.Handle("/static/", http.FileServer(http.FS(staticFiles)))
 	http.HandleFunc("/node-info", infoPage(&dht))
-	http.HandleFunc("/", initHandler(dht))
+	http.HandleFunc("/", initHandler(&dht))
 	log.Printf("Starting HTTP Listener on %s", listenAddr)
 	errCh <- http.ListenAndServe(listenAddr, nil)
 }
 
-func initHandler(dht dhtHost) func(w http.ResponseWriter, r *http.Request) {
+func handleApi(dht *dhtHost, w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "POST":
+		handleSet(dht.dht, w, r)
+	case "GET":
+		handleGet(dht.dht, w, r)
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, "Invalid request.")
+	}
+}
+
+func handleIndex(svelteBuild *fs.FS, w http.ResponseWriter, r *http.Request) {
+
+	index, err := fs.ReadFile(*svelteBuild, "index.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(index)
+}
+
+func initHandler(dht *dhtHost) func(w http.ResponseWriter, r *http.Request) {
+
+	svelteBuild, err := fs.Sub(svelteFs, "nns-web/build")
+	if err != nil {
+		log.Fatal(err)
+	}
+	svelteFs := http.FS(svelteBuild)
+	fileServer := http.FileServer(svelteFs)
+
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
-			// Serve the index page.
-			indexPage(w, r)
+
+		if (r.Header.Get("accept") == "application/json") {
+			handleApi(dht, w, r)
 			return
 		}
 
-		switch r.Method {
-		case "POST":
-			handleSet(dht.dht, w, r)
-		case "GET":
-			handleGet(dht.dht, w, r)
-		default:
-			w.WriteHeader(http.StatusBadRequest)
-			io.WriteString(w, "Invalid request.")
+		f, err := svelteBuild.Open(r.URL.Path[1:])
+
+		if err != nil {
+			handleIndex(&svelteBuild, w, r)
+			return
 		}
+
+		defer f.Close()
+		fileServer.ServeHTTP(w, r)
 	}
 }
 
@@ -96,18 +132,6 @@ func handleGet(dht *dht.IpfsDHT, w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	io.WriteString(w, string(val[:]))
-}
-
-func indexPage(w http.ResponseWriter, r *http.Request) {
-	t, err := template.ParseFS(indexTemplate, "templates/index.html")
-	if err != nil {
-		log.Print("Error parsing template: ", err)
-	}
-
-	err = t.Execute(w, nil)
-	if err != nil {
-		log.Print("Error displaying index page: ", err)
-	}
 }
 
 type StatusPageData struct {

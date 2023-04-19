@@ -89,6 +89,11 @@ func (p *TokenParser) parseAndVerify(ctx context.Context, name string, raw strin
 	var issDID string
 
 	if issStr, ok := mc["iss"].(string); ok {
+		ok = p.issm.MatchIssuer(issStr, name)
+		if !ok {
+			return nil, fmt.Errorf(`"iss" key does not match name (%s != %s)`, issStr, name)
+		}
+
 
 		issKey, err = p.didr.ResolveDIDKey(ctx, issStr, tok)
 		if err != nil {
@@ -102,14 +107,6 @@ func (p *TokenParser) parseAndVerify(ctx context.Context, name string, raw strin
 	var audKey didkey.ID
 	var audDID string
 	if audStr, ok := mc["aud"].(string); ok {
-		// n.b. ideally we would do this for the *issuer*, but existing UCAN tools
-		// (i.e., js ucans) can't (?) sign UCANs for non-did:key issuers, so we're
-		// just working with what we've got.
-		ok = p.issm.MatchIssuer(audStr, name)
-		if !ok {
-			return nil, fmt.Errorf(`"iss" key does not match name (%s != %s)`, audStr, name)
-		}
-
 		audKey, err = p.didr.ResolveDIDKey(ctx, audStr, tok)
 		if err != nil {
 			return nil, err
@@ -214,6 +211,8 @@ func (GenericDIDPubKeyResolver) ResolveDIDKey(ctx context.Context, iss string, t
 	// appropriate, formal DID methods can be supported.
 	case strings.HasPrefix(iss, "did:mailto:"):
 		return resolvers.ResolveMailtoKey(iss, tok)
+	case strings.HasPrefix(iss, "did:dns:"):
+		return resolvers.ResolveDnsKey(iss, tok)
 		//case strings.HasPrefix(iss, "https:"):
 		//  return p.resolveHttpKey(iss, tok)
 		//case strings.HasPrefix(iss, "dnssec:"):
@@ -236,6 +235,8 @@ func (GenericIssuerMatcher) MatchIssuer(iss string, name string) (bool) {
 	switch {
 	case strings.HasPrefix(iss, "did:mailto:"):
 		return resolvers.MatchMailtoIssuer(iss, name)
+  case strings.HasPrefix(iss, "did:dns:"):
+		return resolvers.MatchDnsIssuer(iss, name)
 	}
 	return false
 }

@@ -7,7 +7,7 @@ interface ParsedEmail {
 }
 
 export async function load({params}) {
-  const response = await fetch(`https://nns.contact/${params.name}`)
+  const response = await fetch(`/${params.name}`, {headers: [["accept", "application/json"]]})
   try {
     const text = await response.text()
     console.log(text);

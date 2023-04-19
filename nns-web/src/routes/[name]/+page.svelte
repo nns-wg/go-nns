@@ -40,7 +40,7 @@
 
 {:else if data.ucan}
 
-<CodeSnippet type="multi" hideCopyButton>
+<CodeSnippet hideCopyButton>
 <!-- {formatJson(decodedUcan?.header)} -->
   {formatJson(data.ucan.payload, 80)}
 </CodeSnippet>
